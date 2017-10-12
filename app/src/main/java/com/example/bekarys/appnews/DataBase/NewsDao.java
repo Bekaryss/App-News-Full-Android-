@@ -22,6 +22,9 @@ public interface NewsDao {
     @Insert
     void insert(News news);
 
+    @Insert
+    void insertList(List<News> news);
+
     @Delete
     void delete(News news);
 

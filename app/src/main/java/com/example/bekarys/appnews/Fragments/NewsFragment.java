@@ -18,6 +18,7 @@ import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.helper.ItemTouchHelper;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -27,6 +28,8 @@ import android.widget.EditText;
 import com.example.bekarys.appnews.CategoryModels.CategoriesAdapter;
 import com.example.bekarys.appnews.DataBase.AppDatabase;
 import com.example.bekarys.appnews.MainActivity;
+import com.example.bekarys.appnews.NewsAPIModels.ApiClient;
+import com.example.bekarys.appnews.NewsAPIModels.ApiInterface;
 import com.example.bekarys.appnews.NewsByIdActivity;
 import com.example.bekarys.appnews.NewsModels.News;
 import com.example.bekarys.appnews.NewsModels.NewsAdapter;
@@ -39,6 +42,10 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -63,14 +70,12 @@ public class NewsFragment extends Fragment implements View.OnClickListener{
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         database = Room.databaseBuilder(getActivity().getApplicationContext(), AppDatabase.class, "Room.db").build();
-
-
     }
 
     public void initialize(){
         initDialog();
         initSwipe();
-        new GetNewsAsync().execute();
+        GetNews();
     }
 
     @Override
@@ -79,6 +84,8 @@ public class NewsFragment extends Fragment implements View.OnClickListener{
         recyclerView = rootView.findViewById(R.id.recycler_viewNews);
         FloatingActionButton fab = (FloatingActionButton) rootView.findViewById(R.id.fab_news);
         fab.setOnClickListener(this);
+        FloatingActionButton sync = (FloatingActionButton) rootView.findViewById(R.id.syn_news);
+        sync.setOnClickListener(this);
         initialize();
         return rootView;
     }
@@ -149,6 +156,32 @@ public class NewsFragment extends Fragment implements View.OnClickListener{
 //        adapter.notifyDataSetChanged();
     }
 
+    public void GetNews(){
+        try {
+
+            ApiInterface apiService = ApiClient.getClient().create(ApiInterface.class);
+            Call<List<News>> call = apiService.getNewsAPIList();
+            call.enqueue(new Callback<List<News>>() {
+                @Override
+                public void onResponse(Call<List<News>> call, Response<List<News>> response) {
+                    Log.e("Response", response.body().toString());
+                    List<News> newNewsList = response.body();
+                    setToRecyclerView(newNewsList);
+                    new InsertListAsync().execute(newNewsList);
+                }
+
+                @Override
+                public void onFailure(Call<List<News>> call, Throwable t) {
+                    Log.e("Error", t.getLocalizedMessage());
+                }
+            });
+        } catch (Exception e) {
+            System.out.println("Error " + e.getMessage());
+            new GetNewsAsync().execute();
+        }
+
+    }
+
     public void AddNews(News _news){
         new InsertAsync().execute(_news);
     }
@@ -166,7 +199,27 @@ public class NewsFragment extends Fragment implements View.OnClickListener{
                 alertDialog.setTitle("Add News");
                 alertDialog.show();
                 break;
+            case R.id.syn_news:
+                removeView();
+                SyncWithAPI(newsList);
         }
+    }
+
+    public void SyncWithAPI(List<News> _newsList){
+        ApiInterface apiService = ApiClient.getClient().create(ApiInterface.class);
+        Call<List<News>> postCreateCall = apiService.createNewsAPIBlob();
+
+        postCreateCall.enqueue(new Callback<List<News>>() {
+            @Override
+            public void onResponse(Call<List<News>> call, Response<List<News>> response) {
+                List<News> newsListAPI = response.body();
+            }
+
+            @Override
+            public void onFailure(Call<List<News>> call, Throwable t) {
+
+            }
+        });
     }
 
 
@@ -206,6 +259,27 @@ public class NewsFragment extends Fragment implements View.OnClickListener{
         @Override
         protected Void doInBackground(News ... crNews) {
             database.newsDao().insert(crNews[0]);
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Void aVoid) {
+            super.onPostExecute(aVoid);
+        }
+    }
+
+    private class InsertListAsync extends AsyncTask<List<News>, Void, Void>{
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+        }
+
+        @Override
+        protected Void doInBackground(List<News> ... crNews) {
+            for (News nItem : crNews[0]) {
+                database.newsDao().insert(nItem);
+            }
             return null;
         }
 
