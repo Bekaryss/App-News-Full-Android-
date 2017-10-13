@@ -289,6 +289,8 @@ public class NewsFragment extends Fragment implements View.OnClickListener{
         }
     }
 
+
+
     private  class DeleteAsync extends AsyncTask<News, Void, Void>{
         @Override
         protected void onPreExecute() {
